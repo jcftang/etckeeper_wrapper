@@ -1,0 +1,50 @@
+#!/bin/sh
+set -e
+
+pl="/var/cache/etckeeper/packagelist"
+dirty="/var/cache/etckeeper/dirty"
+host=`hostname`
+inet=`ip -4 address show dev eth0 | grep inet | awk '{print $2}'`
+appname=etckeeper
+NC_OPTS="-w 3"
+
+token="<%= node['le']['etckeeper_token'] %>"
+API=<%= node['le']['api'] %>
+PORT=<%= node['le']['api_port'] %>
+
+# run this if /etc is not clean
+if etckeeper unclean; then
+    message="Logging changes in /etc after $HIGHLEVEL_PACKAGE_MANAGER run"
+
+    echo "$token appname=$appname host=$host action=notification stage='post-install' message='$message' inet='$inet'" | nc $NC_OPTS $API $PORT
+    # list changed files
+    git diff --name-status > $dirty
+    while read -r line
+    do
+        f=$line
+        echo "$token appname=$appname host=$host action=config stage='post-install' change='$f' inet='$inet'" | nc $NC_OPTS $API $PORT
+    done < "$dirty"
+fi
+
+if [ -e $dirty ]; then
+    rm -f $dirty
+fi
+
+# Installed/removed packages
+if [ -e $pl.pre-install ]; then
+    message="Installed or removed packages"
+
+    echo "$token appname=$appname host=$host action=notification stage='post-install' message='$message' inet='$inet'" | nc $NC_OPTS $API $PORT
+    (
+    etckeeper list-installed | diff -U0 $pl.pre-install - | tail -n+4 | egrep '^[-+]' || true
+    ) > $pl.diff
+    while read -r line
+    do
+        name=$line
+        echo "$token appname=$appname host=$host action=package stage='post-install' change='$name' inet='$inet'" | nc $NC_OPTS $API $PORT
+    done < "$pl.diff"
+fi
+
+if [ -e $pl.diff ]; then
+    rm -f $pl.diff
+fi

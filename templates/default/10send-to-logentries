@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+dirty="/var/cache/etckeeper/dirty"
+host=`hostname`
+inet=`ip -4 address show dev eth0 | grep inet | awk '{print $2}'`
+appname=etckeeper
+NC_OPTS="-w 3"
+
+token="<%= node['le']['etckeeper_token'] %>"
+API=<%= node['le']['api'] %>
+PORT=<%= node['le']['api_port'] %> 
+
+# run this if /etc is not clean
+if etckeeper unclean; then
+    message="Logging changes in /etc after $HIGHLEVEL_PACKAGE_MANAGER run"
+
+    echo "$token appname=$appname host=$host action=notification stage='commit' message='$message' inet='$inet'" | nc $NC_OPTS $API $PORT
+    # list changed files
+    git diff --name-status > $dirty
+    while read -r line
+    do
+        f=$line
+        echo "$token appname=$appname host=$host action=config stage='commit' change='$f' inet='$inet'" | nc $NC_OPTS $API $PORT
+    done < "$dirty"
+fi
+
+if [ -e $dirty ]; then
+    rm -f $dirty
+fi
