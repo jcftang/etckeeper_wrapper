@@ -1,3 +1,5 @@
+include_recipe 'apt'
+include_recipe 'etckeeper'
 include_recipe 'etckeeper::commit'
 
 template "/etc/etckeeper/post-install.d/40send-to-logentries" do
