@@ -1,0 +1,15 @@
+---
+driver:
+  name: vagrant
+
+provisioner:
+  name: chef_solo
+
+platforms:
+  - name: debian-7.8
+
+suites:
+  - name: default
+    run_list:
+      - recipe[etckeeper_wrapper::default]
+    attributes:
